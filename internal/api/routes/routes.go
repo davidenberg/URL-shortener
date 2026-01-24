@@ -1,0 +1,16 @@
+package routes
+
+import (
+	"net/http"
+
+	"personal.davidenberg.fi/url-shortener/internal/api/handlers"
+)
+
+func NewRouter(h *handlers.GenerateUrlHandler) http.Handler {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/urls/{shortened_url}", h.Redirect)
+	mux.HandleFunc("/urls", h.ShortenURL)
+
+	return mux
+}
