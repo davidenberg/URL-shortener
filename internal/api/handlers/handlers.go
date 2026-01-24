@@ -60,11 +60,14 @@ func (h *GenerateUrlHandler) ShortenURL(w http.ResponseWriter, r *http.Request) 
 	shortened_url := generateShortURL(req.OriginalURL, models.SHORT_URL_LEN)
 	err = h.psStore.StoreURL(shortened_url, req.OriginalURL, r.Context())
 	if err != nil {
-		http.Error(w, "Failed to generate short URL", http.StatusBadRequest)
-		return
+		_, err = h.psStore.GetURL(shortened_url, r.Context())
+		if err != nil {
+			http.Error(w, "Failed to generate short URL", http.StatusBadRequest)
+			return
+		}
 	}
 	resp := models.ShortenResponse{
-		ShortURL: fmt.Sprintf("personal.davidenberg.fi/%s", shortened_url),
+		ShortURL: fmt.Sprintf("http://localhost:8080/urls/%s", shortened_url),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
