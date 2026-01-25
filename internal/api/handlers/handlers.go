@@ -23,13 +23,15 @@ type GenerateUrlHandler struct {
 	psStore         *repository.PostgresStore
 	analyticsWorker *analytics.Worker
 	Redis           *caching.RedisStore
+	baseDomain      string
 }
 
-func NewHandler(ps *repository.PostgresStore, w *analytics.Worker, r *caching.RedisStore) *GenerateUrlHandler {
+func NewHandler(ps *repository.PostgresStore, w *analytics.Worker, r *caching.RedisStore, baseDomain string) *GenerateUrlHandler {
 	handler := new(GenerateUrlHandler)
 	handler.psStore = ps
 	handler.analyticsWorker = w
 	handler.Redis = r
+	handler.baseDomain = baseDomain
 	return handler
 }
 
@@ -76,7 +78,7 @@ func (h *GenerateUrlHandler) ShortenURL(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 	resp := models.ShortenResponse{
-		ShortURL: fmt.Sprintf("http://localhost:8080/urls/%s", shortened_url),
+		ShortURL: fmt.Sprintf("%s/urls/%s", h.baseDomain, shortened_url),
 	}
 
 	w.Header().Set("Content-Type", "application/json")

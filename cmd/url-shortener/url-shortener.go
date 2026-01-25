@@ -50,7 +50,12 @@ func main() {
 	go analyticsWorker.RunWorker()
 	defer analyticsWorker.Close()
 
-	handler := handlers.NewHandler(store, analyticsWorker, redisStore)
+	baseDomain := os.Getenv("BASE_DOMAIN")
+	if baseDomain == "" {
+		log.Fatalf("Please define BASE_DOMAIN env variable")
+	}
+
+	handler := handlers.NewHandler(store, analyticsWorker, redisStore, baseDomain)
 	router := routes.NewRouter(handler)
 	log.Println("Initialized backend")
 
