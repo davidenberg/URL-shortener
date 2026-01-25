@@ -19,7 +19,7 @@ func main() {
 	log.Println("Initializing backend")
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatalln("Error loading .env file")
+		log.Printf("Error loading .env file: %v", err)
 	}
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
