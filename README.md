@@ -1,6 +1,7 @@
 # URL shortener
 
-URL shortener backend built in Go with a PostgreSQL backend and Redis for caching
+URL shortener backend built in Go with a PostgreSQL backend and Redis for caching <br>
+Example deployment with a simple frontend available at [personal.davidenberg.fi/url-shortener](https://personal.davidenberg.fi/url-shortener)
 
 ## Key Features
 
