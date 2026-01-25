@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"crypto/sha1"
 	"encoding/json"
 	"fmt"
@@ -10,25 +11,37 @@ import (
 	"strings"
 	"time"
 
-	"url-shortener/internal/analytics"
-	"url-shortener/internal/caching"
 	"url-shortener/internal/models"
-	"url-shortener/internal/repository"
 
 	"github.com/jxskiss/base62"
 	"github.com/redis/go-redis/v9"
 )
 
+type URLStorage interface {
+	GetURL(shortenedURL string, ctx context.Context) (string, error)
+	StoreURL(shortenedURL string, originalURL string, ctx context.Context) error
+	GetStatsByURL(shortenedURL string, ctx context.Context) (error, time.Time, int)
+}
+
+type AnalyticsTracker interface {
+	TrackHit(url string)
+}
+
+type CacheStorage interface {
+	Get(ctx context.Context, shortenedURL string) (string, error)
+	Save(ctx context.Context, shortenedURL string, ogURL string, ttl time.Duration) error
+}
+
 type GenerateUrlHandler struct {
-	psStore         *repository.PostgresStore
-	analyticsWorker *analytics.Worker
-	Redis           *caching.RedisStore
+	psStore         URLStorage
+	analyticsWorker AnalyticsTracker
+	Redis           CacheStorage
 	baseDomain      string
 }
 
-func NewHandler(ps *repository.PostgresStore, w *analytics.Worker, r *caching.RedisStore, baseDomain string) *GenerateUrlHandler {
+func NewHandler(s URLStorage, w AnalyticsTracker, r CacheStorage, baseDomain string) *GenerateUrlHandler {
 	handler := new(GenerateUrlHandler)
-	handler.psStore = ps
+	handler.psStore = s
 	handler.analyticsWorker = w
 	handler.Redis = r
 	handler.baseDomain = baseDomain
