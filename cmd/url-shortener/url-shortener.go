@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/joho/godotenv"
+	"personal.davidenberg.fi/url-shortener/internal/analytics"
 	"personal.davidenberg.fi/url-shortener/internal/api/handlers"
 	"personal.davidenberg.fi/url-shortener/internal/api/routes"
 	"personal.davidenberg.fi/url-shortener/internal/repository"
@@ -32,7 +33,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("Could not initialize DB: %v", databaseURL)
 	}
-	handler := handlers.NewHandler(store)
+
+	analyticsWorker := analytics.CreateWorker(store)
+	go analyticsWorker.RunWorker()
+	defer analyticsWorker.Close()
+
+	handler := handlers.NewHandler(store, analyticsWorker)
 	router := routes.NewRouter(handler)
 	log.Println("Initialized backend")
 

@@ -9,3 +9,8 @@ type ShortenRequest struct {
 type ShortenResponse struct {
 	ShortURL string `json:"short_url"`
 }
+
+type StatsResponse struct {
+	CreationTime string `json:"creation_time"`
+	Hits         int    `json:"hits"`
+}

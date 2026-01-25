@@ -10,17 +10,20 @@ import (
 	"strings"
 
 	"github.com/jxskiss/base62"
+	"personal.davidenberg.fi/url-shortener/internal/analytics"
 	"personal.davidenberg.fi/url-shortener/internal/models"
 	"personal.davidenberg.fi/url-shortener/internal/repository"
 )
 
 type GenerateUrlHandler struct {
-	psStore *repository.PostgresStore
+	psStore         *repository.PostgresStore
+	analyticsWorker *analytics.Worker
 }
 
-func NewHandler(ps *repository.PostgresStore) *GenerateUrlHandler {
+func NewHandler(ps *repository.PostgresStore, w *analytics.Worker) *GenerateUrlHandler {
 	handler := new(GenerateUrlHandler)
 	handler.psStore = ps
+	handler.analyticsWorker = w
 	return handler
 }
 
@@ -88,5 +91,27 @@ func (h *GenerateUrlHandler) Redirect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.analyticsWorker.TrackHit(shortenedURL)
+
 	http.Redirect(w, r, originalURL, http.StatusFound)
+}
+
+func (h *GenerateUrlHandler) GetURLStatistics(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	shortenedURL := strings.TrimPrefix(r.URL.Path, "/urls/stats/")
+	err, time, hits := h.psStore.GetStatsByURL(shortenedURL, r.Context())
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "URL not found", http.StatusNotFound)
+		return
+	}
+	resp := models.StatsResponse{
+		CreationTime: fmt.Sprintf("%v", time),
+		Hits:         hits,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
 }
