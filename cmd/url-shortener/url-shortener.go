@@ -6,11 +6,13 @@ import (
 	"net/http"
 	"os"
 
+	"url-shortener/internal/analytics"
+	"url-shortener/internal/api/handlers"
+	"url-shortener/internal/api/routes"
+	"url-shortener/internal/caching"
+	"url-shortener/internal/repository"
+
 	"github.com/joho/godotenv"
-	"personal.davidenberg.fi/url-shortener/internal/analytics"
-	"personal.davidenberg.fi/url-shortener/internal/api/handlers"
-	"personal.davidenberg.fi/url-shortener/internal/api/routes"
-	"personal.davidenberg.fi/url-shortener/internal/repository"
 )
 
 func main() {
@@ -34,11 +36,21 @@ func main() {
 		log.Fatalf("Could not initialize DB: %v", databaseURL)
 	}
 
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		log.Fatalln("No redis address defined")
+	}
+	redisStore, err := caching.NewRedisStore(redisAddr)
+	if err != nil {
+		log.Fatalf("Could not connect to Redis Cache: %v", err)
+	}
+	defer redisStore.Close()
+
 	analyticsWorker := analytics.CreateWorker(store)
 	go analyticsWorker.RunWorker()
 	defer analyticsWorker.Close()
 
-	handler := handlers.NewHandler(store, analyticsWorker)
+	handler := handlers.NewHandler(store, analyticsWorker, redisStore)
 	router := routes.NewRouter(handler)
 	log.Println("Initialized backend")
 

@@ -8,6 +8,7 @@ services:
       DATABASE_URL: ${DATABASE_URL}
     depends_on:
       - postgres
+      - redis
   
   postgres:
     image: postgres:18-alpine
@@ -16,3 +17,15 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
+
+  redis:
+    image: redis:8.4-alpine
+    restart: always
+    command:
+    - /bin/sh
+    - -c
+    - redis-server --requirepass ${REDIS_PASSWORD}
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf

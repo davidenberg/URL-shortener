@@ -8,22 +8,28 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
+
+	"url-shortener/internal/analytics"
+	"url-shortener/internal/caching"
+	"url-shortener/internal/models"
+	"url-shortener/internal/repository"
 
 	"github.com/jxskiss/base62"
-	"personal.davidenberg.fi/url-shortener/internal/analytics"
-	"personal.davidenberg.fi/url-shortener/internal/models"
-	"personal.davidenberg.fi/url-shortener/internal/repository"
+	"github.com/redis/go-redis/v9"
 )
 
 type GenerateUrlHandler struct {
 	psStore         *repository.PostgresStore
 	analyticsWorker *analytics.Worker
+	Redis           *caching.RedisStore
 }
 
-func NewHandler(ps *repository.PostgresStore, w *analytics.Worker) *GenerateUrlHandler {
+func NewHandler(ps *repository.PostgresStore, w *analytics.Worker, r *caching.RedisStore) *GenerateUrlHandler {
 	handler := new(GenerateUrlHandler)
 	handler.psStore = ps
 	handler.analyticsWorker = w
+	handler.Redis = r
 	return handler
 }
 
@@ -83,12 +89,32 @@ func (h *GenerateUrlHandler) Redirect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	shortenedURL := strings.TrimPrefix(r.URL.Path, "/urls/")
-	originalURL, err := h.psStore.GetURL(shortenedURL, r.Context())
 
-	if err != nil {
-		log.Println(err)
-		http.Error(w, "URL not found", http.StatusNotFound)
-		return
+	originalURL, err := h.Redis.Get(r.Context(), shortenedURL)
+
+	if err == redis.Nil {
+		log.Printf("Cache miss %s", originalURL)
+
+		originalURL, err = h.psStore.GetURL(shortenedURL, r.Context())
+		if err != nil {
+			log.Println(err)
+			http.Error(w, "URL not found", http.StatusNotFound)
+			return
+		}
+		err = h.Redis.Save(r.Context(), shortenedURL, originalURL, time.Hour)
+		if err != nil {
+			log.Printf("Failed to cache URL %s, %v", shortenedURL, err)
+		}
+	} else if err != nil {
+		log.Printf("Redis error %v", err)
+		originalURL, err = h.psStore.GetURL(shortenedURL, r.Context())
+		if err != nil {
+			log.Println(err)
+			http.Error(w, "URL not found", http.StatusNotFound)
+			return
+		}
+	} else {
+		log.Println("Cache hit")
 	}
 
 	h.analyticsWorker.TrackHit(shortenedURL)

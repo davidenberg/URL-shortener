@@ -3,7 +3,7 @@ package routes
 import (
 	"net/http"
 
-	"personal.davidenberg.fi/url-shortener/internal/api/handlers"
+	"url-shortener/internal/api/handlers"
 )
 
 func NewRouter(h *handlers.GenerateUrlHandler) http.Handler {

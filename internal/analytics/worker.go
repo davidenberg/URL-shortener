@@ -4,7 +4,7 @@ import (
 	"context"
 	"log"
 
-	"personal.davidenberg.fi/url-shortener/internal/repository"
+	"url-shortener/internal/repository"
 )
 
 type Worker struct {
