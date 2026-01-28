@@ -3,8 +3,8 @@ package handlers
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
-	"errors"
 	"math/rand/v2"
 	"net/http"
 	"net/http/httptest"
@@ -24,7 +24,7 @@ type MockURLStore struct {
 func (m *MockURLStore) GetURL(shortenedURL string, ctx context.Context) (string, error) {
 	val, ok := m.data[shortenedURL]
 	if !ok {
-		return "", errors.New("Not found")
+		return "", sql.ErrNoRows
 	}
 	return val, nil
 }
@@ -44,12 +44,12 @@ func (m *MockURLStore) StoreURL(shortenedURL string, originalURL string, ctx con
 func (m *MockURLStore) GetStatsByURL(shortenedURL string, ctx context.Context) (error, time.Time, int) {
 	val, ok := m.created_at[shortenedURL]
 	if !ok {
-		return errors.New("Not found"), time.Time{}, 0
+		return sql.ErrNoRows, time.Time{}, 0
 	}
 
 	hits, ok := m.hits[shortenedURL]
 	if !ok {
-		return errors.New("Not found"), time.Time{}, 0
+		return sql.ErrNoRows, time.Time{}, 0
 	}
 
 	return nil, val, hits
