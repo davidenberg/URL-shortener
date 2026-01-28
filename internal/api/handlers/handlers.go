@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"crypto/sha1"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -111,9 +112,13 @@ func (h *GenerateUrlHandler) Redirect(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Cache miss %s", originalURL)
 
 		originalURL, err = h.psStore.GetURL(shortenedURL, r.Context())
-		if err != nil {
+		if err == sql.ErrNoRows {
 			log.Println(err)
 			http.Error(w, "URL not found", http.StatusNotFound)
+			return
+		} else if err != nil {
+			log.Println(err)
+			http.Error(w, "URL not found", http.StatusInternalServerError)
 			return
 		}
 		err = h.Redis.Save(r.Context(), shortenedURL, originalURL, time.Hour)
