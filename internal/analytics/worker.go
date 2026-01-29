@@ -5,23 +5,26 @@ import (
 	"log"
 
 	"url-shortener/internal/repository"
+
+	"golang.org/x/sync/errgroup"
 )
 
 type Worker struct {
-	store  *repository.PostgresStore
-	events chan string
-	ctx    context.Context
-	cancel context.CancelFunc
+	store      *repository.PostgresStore
+	events     chan string
+	ctx        context.Context
+	cancel     context.CancelFunc
+	numWorkers int
 }
 
-func CreateWorker(store *repository.PostgresStore) *Worker {
-	c := make(chan string)
-	w := new(Worker)
+func CreateWorker(store *repository.PostgresStore, numWorkers int) *Worker {
 	ctx, cancel := context.WithCancel(context.Background())
+	w := new(Worker)
 	w.store = store
-	w.events = c
+	w.events = make(chan string)
 	w.ctx = ctx
 	w.cancel = cancel
+	w.numWorkers = numWorkers
 	return w
 }
 
@@ -31,23 +34,37 @@ func (w *Worker) Close() {
 }
 
 func (w *Worker) RunWorker() {
-	log.Println("Analytics worker started")
+	g, ctx := errgroup.WithContext(w.ctx)
+	log.Printf("Starting analytics worker pool with %d workers", w.numWorkers)
 	var shortUrl string
-	for {
-		select {
-		case <-w.ctx.Done():
-			return
-		case shortUrl = <-w.events:
-			err := w.store.IncrementHits(shortUrl, w.ctx)
-			if err != nil {
-				log.Printf("Failed to track click for %s: %v", shortUrl, err)
+	for i := 0; i < w.numWorkers; i++ {
+		g.Go(func() error {
+			for {
+				select {
+				case <-ctx.Done():
+					return nil
+				case shortUrl = <-w.events:
+					err := w.store.IncrementHits(shortUrl, w.ctx)
+					if err != nil {
+						log.Printf("Failed to track click for %s: %v", shortUrl, err)
+					}
+				}
 			}
-		}
+		})
+	}
+	log.Println("Analytics worker pool started")
+	err := g.Wait()
+	if err != nil {
+		log.Printf("Analytics worker pool shut down by error: %v", err)
+	} else {
+		log.Printf("Analytics worker pool shut down gracefully")
 	}
 }
 
 func (w *Worker) TrackHit(url string) {
 	select {
+	case <-w.ctx.Done():
+		return
 	case w.events <- url:
 		return
 	default:

@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 
 	"url-shortener/internal/analytics"
 	"url-shortener/internal/api/handlers"
@@ -46,7 +47,12 @@ func main() {
 	}
 	defer redisStore.Close()
 
-	analyticsWorker := analytics.CreateWorker(store)
+	var numWorkers int
+	numWorkers, err = strconv.Atoi(os.Getenv("ANALYTICS_WORKER_NUM"))
+	if err != nil {
+		numWorkers = 10
+	}
+	analyticsWorker := analytics.CreateWorker(store, numWorkers)
 	go analyticsWorker.RunWorker()
 	defer analyticsWorker.Close()
 
