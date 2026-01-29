@@ -27,4 +27,4 @@ jobs:
       run: go build ./cmd/url-shortener
 
     - name: Test
-      run: go test -v ./internal/api/handlers
+      run: go test -v -race ./internal/api/handlers

@@ -68,6 +68,10 @@ type MockTracker struct{}
 
 func (m *MockTracker) TrackHit(url string) {}
 
+type invalidBody struct {
+	Invalid string `json:"invalid"`
+}
+
 func TestShortenURL(t *testing.T) {
 	mockStore := &MockURLStore{}
 	mockCache := &MockCache{}
@@ -86,6 +90,16 @@ func TestShortenURL(t *testing.T) {
 		{
 			name:           "Invalid URL",
 			body:           models.ShortenRequest{OriginalURL: "not-a-url"},
+			expectedStatus: http.StatusBadRequest,
+		},
+		{
+			name:           "Invalid Json",
+			body:           invalidBody{Invalid: "akjsdhf"},
+			expectedStatus: http.StatusBadRequest,
+		},
+		{
+			name:           "Invalid Body",
+			body:           "asdfasdfw",
 			expectedStatus: http.StatusBadRequest,
 		},
 		{
