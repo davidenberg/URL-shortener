@@ -11,7 +11,7 @@ import (
 
 type Worker struct {
 	store      *repository.PostgresStore
-	events     chan string
+	Events     chan string
 	ctx        context.Context
 	cancel     context.CancelFunc
 	numWorkers int
@@ -21,7 +21,7 @@ func CreateWorker(store *repository.PostgresStore, numWorkers int) *Worker {
 	ctx, cancel := context.WithCancel(context.Background())
 	w := new(Worker)
 	w.store = store
-	w.events = make(chan string)
+	w.Events = make(chan string)
 	w.ctx = ctx
 	w.cancel = cancel
 	w.numWorkers = numWorkers
@@ -30,7 +30,6 @@ func CreateWorker(store *repository.PostgresStore, numWorkers int) *Worker {
 
 func (w *Worker) Close() {
 	w.cancel()
-	close(w.events)
 }
 
 func (w *Worker) RunWorker() {
@@ -43,10 +42,11 @@ func (w *Worker) RunWorker() {
 				select {
 				case <-ctx.Done():
 					return nil
-				case shortUrl = <-w.events:
+				case shortUrl = <-w.Events:
 					err := w.store.IncrementHits(shortUrl, w.ctx)
 					if err != nil {
 						log.Printf("Failed to track click for %s: %v", shortUrl, err)
+						return err
 					}
 				}
 			}
@@ -54,6 +54,7 @@ func (w *Worker) RunWorker() {
 	}
 	log.Println("Analytics worker pool started")
 	err := g.Wait()
+	close(w.Events)
 	if err != nil {
 		log.Printf("Analytics worker pool shut down by error: %v", err)
 	} else {
@@ -65,7 +66,7 @@ func (w *Worker) TrackHit(url string) {
 	select {
 	case <-w.ctx.Done():
 		return
-	case w.events <- url:
+	case w.Events <- url:
 		return
 	default:
 		log.Println("Something went wrong when queuing work")

@@ -5,7 +5,10 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
+	"time"
 
 	"url-shortener/internal/analytics"
 	"url-shortener/internal/api/handlers"
@@ -16,7 +19,45 @@ import (
 	"github.com/joho/godotenv"
 )
 
+type cleanupStruct struct {
+	store           *repository.PostgresStore
+	redisStore      *caching.RedisStore
+	analyticsWorker *analytics.Worker
+}
+
+func cleanUp(cleanup *cleanupStruct) {
+	if cleanup.store != nil {
+		log.Println("Cleaning up Postgres store")
+		cleanup.store.Close()
+	}
+	if cleanup.redisStore != nil {
+		log.Println("Cleaning up Redis store")
+		cleanup.redisStore.Close()
+	}
+	if cleanup.analyticsWorker != nil {
+		log.Println("Cleaning up Analytics worker pool store")
+		cleanup.analyticsWorker.Close()
+		for {
+			select {
+			case _, ok := <-cleanup.analyticsWorker.Events:
+				if !ok {
+					log.Println("Event channel closed, all analytics workers are finished")
+				} else {
+					continue
+				}
+			case <-time.After(60 * time.Second):
+				log.Println("Analytics worker cleanup timed out")
+			}
+			break
+		}
+	}
+	os.Exit(0)
+}
+
 func main() {
+	cleanup := &cleanupStruct{nil, nil, nil}
+	defer cleanUp(cleanup)
+
 	log.Println("Initializing backend")
 	err := godotenv.Load()
 	if err != nil {
@@ -31,7 +72,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("Could not connect to DB: %v", databaseURL)
 	}
-	defer store.Close()
+	cleanup.store = store
+
 	err = store.InitPostgresStore(ctx)
 	if err != nil {
 		log.Fatalf("Could not initialize DB: %v", databaseURL)
@@ -45,7 +87,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Could not connect to Redis Cache: %v", err)
 	}
-	defer redisStore.Close()
+	cleanup.redisStore = redisStore
 
 	var numWorkers int
 	numWorkers, err = strconv.Atoi(os.Getenv("ANALYTICS_WORKER_NUM"))
@@ -54,7 +96,7 @@ func main() {
 	}
 	analyticsWorker := analytics.CreateWorker(store, numWorkers)
 	go analyticsWorker.RunWorker()
-	defer analyticsWorker.Close()
+	cleanup.analyticsWorker = analyticsWorker
 
 	baseDomain := os.Getenv("BASE_DOMAIN")
 	if baseDomain == "" {
@@ -64,6 +106,15 @@ func main() {
 	handler := handlers.NewHandler(store, analyticsWorker, redisStore, baseDomain)
 	router := routes.NewRouter(handler)
 	log.Println("Initialized backend")
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		for sig := range c {
+			log.Printf("Caught signal %v, exiting", sig)
+			cleanUp(cleanup)
+		}
+	}()
 
 	port := ":8080"
 	err = http.ListenAndServe(port, router)
