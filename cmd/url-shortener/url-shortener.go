@@ -8,7 +8,6 @@ import (
 	"os/signal"
 	"strconv"
 	"syscall"
-	"time"
 
 	"url-shortener/internal/analytics"
 	"url-shortener/internal/api/handlers"
@@ -35,21 +34,9 @@ func cleanUp(cleanup *cleanupStruct) {
 		cleanup.redisStore.Close()
 	}
 	if cleanup.analyticsWorker != nil {
-		log.Println("Cleaning up Analytics worker pool store")
+		log.Println("Analytics worker pool shutting down")
 		cleanup.analyticsWorker.Close()
-		for {
-			select {
-			case _, ok := <-cleanup.analyticsWorker.Events:
-				if !ok {
-					log.Println("Event channel closed, all analytics workers are finished")
-				} else {
-					continue
-				}
-			case <-time.After(60 * time.Second):
-				log.Println("Analytics worker cleanup timed out")
-			}
-			break
-		}
+		log.Println("Analytics worker pool shut down")
 	}
 	os.Exit(0)
 }

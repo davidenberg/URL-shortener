@@ -3,10 +3,9 @@ package analytics
 import (
 	"context"
 	"log"
+	"sync"
 
 	"url-shortener/internal/repository"
-
-	"golang.org/x/sync/errgroup"
 )
 
 type Worker struct {
@@ -15,6 +14,7 @@ type Worker struct {
 	ctx        context.Context
 	cancel     context.CancelFunc
 	numWorkers int
+	wg         *sync.WaitGroup
 }
 
 func CreateWorker(store *repository.PostgresStore, numWorkers int) *Worker {
@@ -25,41 +25,38 @@ func CreateWorker(store *repository.PostgresStore, numWorkers int) *Worker {
 	w.ctx = ctx
 	w.cancel = cancel
 	w.numWorkers = numWorkers
+	w.wg = nil
 	return w
 }
 
 func (w *Worker) Close() {
 	w.cancel()
+	if w.wg != nil {
+		w.wg.Wait()
+	}
 }
 
 func (w *Worker) RunWorker() {
-	g, ctx := errgroup.WithContext(w.ctx)
+	w.wg = new(sync.WaitGroup)
 	log.Printf("Starting analytics worker pool with %d workers", w.numWorkers)
 	var shortUrl string
 	for i := 0; i < w.numWorkers; i++ {
-		g.Go(func() error {
+		w.wg.Go(func() {
 			for {
 				select {
-				case <-ctx.Done():
-					return nil
+				case <-w.ctx.Done():
+					return
 				case shortUrl = <-w.Events:
 					err := w.store.IncrementHits(shortUrl, w.ctx)
 					if err != nil {
 						log.Printf("Failed to track click for %s: %v", shortUrl, err)
-						return err
 					}
 				}
 			}
 		})
 	}
 	log.Println("Analytics worker pool started")
-	err := g.Wait()
-	close(w.Events)
-	if err != nil {
-		log.Printf("Analytics worker pool shut down by error: %v", err)
-	} else {
-		log.Printf("Analytics worker pool shut down gracefully")
-	}
+
 }
 
 func (w *Worker) TrackHit(url string) {
