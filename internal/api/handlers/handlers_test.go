@@ -79,32 +79,38 @@ func TestShortenURL(t *testing.T) {
 	handler := NewHandler(mockStore, mockTracker, mockCache, "")
 	tests := []struct {
 		name           string
-		body           interface{}
+		body           any
+		header         bool
 		expectedStatus int
 	}{
 		{
 			name:           "Valid URL",
 			body:           models.ShortenRequest{OriginalURL: "https://google.com"},
+			header:         true,
 			expectedStatus: http.StatusOK,
 		},
 		{
 			name:           "Invalid URL",
 			body:           models.ShortenRequest{OriginalURL: "not-a-url"},
+			header:         true,
 			expectedStatus: http.StatusBadRequest,
 		},
 		{
 			name:           "Invalid Json",
 			body:           invalidBody{Invalid: "akjsdhf"},
+			header:         true,
 			expectedStatus: http.StatusBadRequest,
 		},
 		{
 			name:           "Invalid Body",
 			body:           "asdfasdfw",
+			header:         true,
 			expectedStatus: http.StatusBadRequest,
 		},
 		{
 			name:           "Empty Body",
 			body:           nil,
+			header:         false,
 			expectedStatus: http.StatusBadRequest,
 		},
 	}
@@ -117,6 +123,9 @@ func TestShortenURL(t *testing.T) {
 			}
 
 			req, _ := http.NewRequest("POST", "/urls", bytes.NewBuffer(jsonBody))
+			if tc.header {
+				req.Header.Add("Content-Type", "application/json")
+			}
 
 			rr := httptest.NewRecorder()
 			handler.ShortenURL(rr, req)
