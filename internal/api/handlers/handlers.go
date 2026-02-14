@@ -121,7 +121,7 @@ func (h *GenerateUrlHandler) Redirect(w http.ResponseWriter, r *http.Request) {
 			return
 		} else if err != nil {
 			log.Println(err)
-			http.Error(w, "URL not found", http.StatusInternalServerError)
+			http.Error(w, "Database issue", http.StatusInternalServerError)
 			return
 		}
 		err = h.Redis.Save(r.Context(), shortenedURL, originalURL, time.Hour)
@@ -131,9 +131,13 @@ func (h *GenerateUrlHandler) Redirect(w http.ResponseWriter, r *http.Request) {
 	} else if err != nil {
 		log.Printf("Redis error %v", err)
 		originalURL, err = h.psStore.GetURL(shortenedURL, r.Context())
-		if err != nil {
+		if err == sql.ErrNoRows {
 			log.Println(err)
 			http.Error(w, "URL not found", http.StatusNotFound)
+			return
+		} else if err != nil {
+			log.Println(err)
+			http.Error(w, "Database issue", http.StatusInternalServerError)
 			return
 		}
 	} else {
@@ -152,9 +156,13 @@ func (h *GenerateUrlHandler) GetURLStatistics(w http.ResponseWriter, r *http.Req
 	}
 	shortenedURL := strings.TrimPrefix(r.URL.Path, "/urls/stats/")
 	err, time, hits := h.psStore.GetStatsByURL(shortenedURL, r.Context())
-	if err != nil {
+	if err == sql.ErrNoRows {
 		log.Println(err)
 		http.Error(w, "URL not found", http.StatusNotFound)
+		return
+	} else if err != nil {
+		log.Println(err)
+		http.Error(w, "Database issue", http.StatusInternalServerError)
 		return
 	}
 	resp := models.StatsResponse{
