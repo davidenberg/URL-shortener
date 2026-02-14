@@ -50,6 +50,10 @@ Generates a unique 8-character identifier for the URL <br>
   "hits": <Number of hits>
 }
 ```
+## System design
+
+![System design of the URL shortener](/images/url_shortener_architecture.png)
+
 ## License
 
 [MIT](https://choosealicense.com/licenses/mit/)
