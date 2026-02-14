@@ -45,6 +45,15 @@ func main() {
 	cleanup := &cleanupStruct{nil, nil, nil}
 	defer cleanUp(cleanup)
 
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		for sig := range c {
+			log.Printf("Caught signal %v, exiting", sig)
+			cleanUp(cleanup)
+		}
+	}()
+
 	log.Println("Initializing backend")
 	err := godotenv.Load()
 	if err != nil {
@@ -93,15 +102,6 @@ func main() {
 	handler := handlers.NewHandler(store, analyticsWorker, redisStore, baseDomain)
 	router := routes.NewRouter(handler)
 	log.Println("Initialized backend")
-
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		for sig := range c {
-			log.Printf("Caught signal %v, exiting", sig)
-			cleanUp(cleanup)
-		}
-	}()
 
 	port := ":8080"
 	err = http.ListenAndServe(port, router)
