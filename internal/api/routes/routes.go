@@ -9,9 +9,9 @@ import (
 func NewRouter(h *handlers.GenerateUrlHandler) http.Handler {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/urls/stats/{shortened_url}", h.GetURLStatistics)
-	mux.HandleFunc("/urls/{shortened_url}", h.Redirect)
-	mux.HandleFunc("/urls", h.ShortenURL)
+	mux.HandleFunc("GET /urls/stats/{shortened_url}", h.GetURLStatistics)
+	mux.HandleFunc("GET /urls/{shortened_url}", h.Redirect)
+	mux.HandleFunc("POST /urls", h.ShortenURL)
 
 	return mux
 }
