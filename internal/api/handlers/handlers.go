@@ -57,6 +57,10 @@ func generateShortURL(url string, len int) string {
 }
 
 func (h *GenerateUrlHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	ct := r.Header.Get("Content-Type")
 	if ct != "" {
 		mediaType := strings.ToLower(strings.TrimSpace(strings.Split(ct, ";")[0]))
@@ -64,9 +68,8 @@ func (h *GenerateUrlHandler) ShortenURL(w http.ResponseWriter, r *http.Request) 
 			http.Error(w, "Content-Type is not application/json", http.StatusUnsupportedMediaType)
 			return
 		}
-	}
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	} else {
+		http.Error(w, "Content-Type is not application/json", http.StatusBadRequest)
 		return
 	}
 	var req models.ShortenRequest
