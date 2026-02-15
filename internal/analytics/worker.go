@@ -21,7 +21,7 @@ func CreateWorker(store *repository.PostgresStore, numWorkers int) *Worker {
 	ctx, cancel := context.WithCancel(context.Background())
 	w := new(Worker)
 	w.store = store
-	w.Events = make(chan string)
+	w.Events = make(chan string, 100)
 	w.ctx = ctx
 	w.cancel = cancel
 	w.numWorkers = numWorkers
